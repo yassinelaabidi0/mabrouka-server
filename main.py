@@ -9,7 +9,7 @@ ALERT_LEVEL = 30
 
 # !!! IMPORTANT !!!
 # Make sure this is your correct public URL
-APP_URL = "https://YOUR-APP-NAME.onrender.com" 
+APP_URL = "https://mabrouka-server.onrender.com" 
 
 # Create a unique alert "channel" on ntfy.sh
 ALERT_TOPIC_NAME = "mabrouka-farm-alert-team-XYZ" # CHANGE THIS
@@ -84,4 +84,5 @@ if __name__ == '__main__':
     # Use Render's PORT environment variable, default to 8080
     port = int(os.environ.get('PORT', 8080))
     socketio.run(app, host='0.0.0.0', port=port, debug=True)
+
 
