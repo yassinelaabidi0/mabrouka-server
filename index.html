@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimal-ui">
+    <title>Farm Status</title>
+    <style>
+        /* ... all the CSS from the previous answer ... */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            background-color: #f0f0f0; 
+            transition: background-color 1s;
+        }
+        
+        #container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        #soil-icon {
+            font-size: 200px;
+            line-height: 1;
+            transition: transform 0.5s;
+        }
+        
+        #status-text {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-top: 20px;
+            color: #333;
+        }
+
+        #pump-status {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            font-size: 50px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            padding: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        
+        #loading {
+            font-size: 2rem;
+            color: #888;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spinning {
+            animation: spin 2s linear infinite;
+        }
+
+        .good { background-color: #d4edda; color: #155724; }
+        .warn { background-color: #fff3cd; color: #856404; }
+        .crit { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    
+    <div id="container">
+        <div id="loading">Connecting...</div>
+        <div id="soil-icon" style="display: none;">🌱</div>
+        <div id="status-text" style="display: none;"></div>
+    </div>
+    
+    <div id="pump-status" style="display: none;">💧</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    
+    <script>
+        // ... all the JavaScript from the previous answer ...
+        const soilIcon = document.getElementById('soil-icon');
+        const statusText = document.getElementById('status-text');
+        const pumpStatus = document.getElementById('pump-status');
+        const container = document.getElementById('container');
+        const loading = document.getElementById('loading');
+        
+        // 2. Connect to the Socket.IO server
+        const socket = io(); 
+
+        socket.on('connect', () => {
+            console.log('Connected to server!');
+            loading.style.display = 'none';
+            soilIcon.style.display = 'block';
+            statusText.style.display = 'block';
+            pumpStatus.style.display = 'block';
+        });
+
+        socket.on('farm_update', (data) => {
+            console.log('Received update:', data);
+            
+            const soil = data.soil;
+            if (soil > 70) {
+                soilIcon.innerHTML = '🌱';
+                statusText.innerHTML = 'Good';
+                container.className = 'good';
+            } else if (soil > 30) {
+                soilIcon.innerHTML = '😟';
+                statusText.innerHTML = 'Dry';
+                container.className = 'warn';
+            } else {
+                soilIcon.innerHTML = '🥵';
+                statusText.innerHTML = 'Critical!';
+                container.className = 'crit';
+            }
+            
+            const pump = data.pump;
+            if (pump === "ON") {
+                pumpStatus.innerHTML = '💦';
+                pumpStatus.classList.add('spinning');
+            } else {
+                pumpStatus.innerHTML = '💧';
+                pumpStatus.classList.remove('spinning');
+            }
+        });
+        
+        socket.on('disconnect', () => {
+            loading.innerHTML = 'Reconnecting...';
+            loading.style.display = 'block';
+            soilIcon.style.display = 'none';
+            statusText.style.display = 'none';
+            pumpStatus.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
