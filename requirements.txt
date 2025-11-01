@@ -1,6 +1,5 @@
 Flask
 Flask-SocketIO
-paho-mqtt
 requests
 gunicorn
 eventlet
