@@ -29,6 +29,9 @@ def index():
 # --- 3. NEW: SOCKET.IO EVENT HANDLER ---
 # This function receives data from your farm_simulator.py
 @socketio.on('farm_update')
+# --- 3. NEW: SOCKET.IO EVENT HANDLER ---
+# This function receives data from your farm_simulator.py
+@socketio.on('farm_update')
 def handle_farm_update(data):
     """
     Receives data from the farm simulator and broadcasts
@@ -38,7 +41,10 @@ def handle_farm_update(data):
     
     # Broadcast this data to all *other* clients (i.e., the browsers)
     # This is the magic that sends the data to the visual app
-emit('farm_update', data, broadcast=True)    
+    
+    # !!! THIS IS THE CORRECTED LINE, NOW INDENTED PROPERLY !!!
+    emit('farm_update', data, broadcast=True) 
+       
     # Run the alert check
     if 'soil' in data:
         if data['soil'] < ALERT_LEVEL:
@@ -84,5 +90,6 @@ if __name__ == '__main__':
     # Use Render's PORT environment variable, default to 8080
     port = int(os.environ.get('PORT', 8080))
     socketio.run(app, host='0.0.0.0', port=port, debug=True)
+
 
 
