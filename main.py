@@ -33,24 +33,16 @@ def index():
 # This function receives data from your farm_simulator.py
 @socketio.on('farm_update')
 def handle_farm_update(data):
-    """
-    Receives data from the farm simulator and broadcasts
-    it to all other connected clients (the web browsers).
-    """
+
     print(f"Server received update from simulator: {data}")
-    
-    # Broadcast this data to all *other* clients (i.e., the browsers)
-    # This is the magic that sends the data to the visual app
-    
-    # !!! THIS IS THE CORRECTED LINE, NOW INDENTED PROPERLY !!!
+
     emit('farm_update', data, broadcast=True) 
        
-    # Run the alert check
     if 'soil' in data:
         if data['soil'] < ALERT_LEVEL:
-            threading.Thread(target=send_alert, args=("critical",)).start()
+            socketio.start_background_task(send_alert, "critical")
         elif data['soil'] > (ALERT_LEVEL + 10):
-            threading.Thread(target=send_alert, args=("good",)).start()
+            socketio.start_background_task(send_alert, "good")
 
 @socketio.on('connect')
 def handle_connect():
@@ -61,9 +53,12 @@ def handle_disconnect():
     print('A client disconnected')
     
 # --- 4. ALERTING LOGIC (ntfy.sh) ---
+# --- 4. ALERTING LOGIC (ntfy.sh) ---
 def send_alert(alert_type="critical"):
     global last_alert_sent
     if alert_type == "critical" and not last_alert_sent:
+        # Set the flag *before* the request to prevent spam
+        last_alert_sent = True
         print(f"ALERT! Soil is critical. Sending push notification...")
         try:
             requests.post(
@@ -76,13 +71,13 @@ def send_alert(alert_type="critical"):
                 },
                 data="The soil is very dry! Please check the farm." 
             )
-            last_alert_sent = True 
+            print("Alert sent successfully.")
         except Exception as e:
             print(f"Error sending alert: {e}")
             
     elif alert_type == "good" and last_alert_sent:
         print("RESET! Soil is good again.")
-        last_alert_sent = False 
+        last_alert_sent = False
 
 # --- 5. RUN SERVER ---
 if __name__ == '__main__':
@@ -90,6 +85,7 @@ if __name__ == '__main__':
     # Use Render's PORT environment variable, default to 8080
     port = int(os.environ.get('PORT', 8080))
     socketio.run(app, host='0.0.0.0', port=port, debug=True)
+
 
 
 
