@@ -27,25 +27,24 @@ def handle_farm_update(data):
     Receives data from the farm simulator and broadcasts
     it to all other connected clients (the web browsers).
     """
-    # print(f"Server received update from simulator: {data}") # Commented out to reduce log spam
     emit('farm_update', data, broadcast=True) 
        
-    if 'soil' in data:
-        if data['soil'] < ALERT_LEVEL:
+    # We will alert based on the *average* soil
+    if 'soil_avg' in data:
+        if data['soil_avg'] < ALERT_LEVEL:
             socketio.start_background_task(send_alert, "critical")
-        elif data['soil'] > (ALERT_LEVEL + 10):
+        elif data['soil_avg'] > (ALERT_LEVEL + 10):
             socketio.start_background_task(send_alert, "good")
 
-# --- UPDATED: Handler for new buttons ---
-@socketio.on('command')
-def handle_command(data):
+# --- UPDATED: Handler for new plant-specific buttons ---
+@socketio.on('command_water')
+def handle_water_command(data):
     """
-    Receives a command from a browser (e.g., { 'pump': 'ON' }).
-    Broadcasts a 'command_to_sim' event for the simulator to hear.
+    Receives a command from a browser (e.g., { 'plant': 'tomatoes' }).
+    Broadcasts a 'sim_water_plant' event for the simulator to hear.
     """
-    print(f"Server received command from browser: {data}")
-    # Broadcast a *different* event name for the simulator to listen to
-    emit('command_to_sim', data, broadcast=True)
+    print(f"Server received water command from browser: {data}")
+    emit('sim_water_plant', data, broadcast=True)
 
 @socketio.on('connect')
 def handle_connect():
