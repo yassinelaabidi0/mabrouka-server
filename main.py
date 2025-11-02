@@ -2,19 +2,13 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 import requests
 import threading
-import os # Added for Render's PORT
+import os 
 
 # --- 1. CONFIGURATION ---
 ALERT_LEVEL = 30 
-
-# !!! IMPORTANT !!!
-# Make sure this is your correct public URL
 APP_URL = "https://mabrouka-server.onrender.com" 
-
-# Create a unique alert "channel" on ntfy.sh
-ALERT_TOPIC_NAME = "mabrouka-farm-alert-team-XYZ" # CHANGE THIS
+ALERT_TOPIC_NAME = "mabrouka-farm-alert-team-XYZ"
 ALERT_URL = f"https://ntfy.sh/{ALERT_TOPIC_NAME}"
-
 last_alert_sent = False
 
 # --- 2. FLASK & SOCKET.IO SETUP ---
@@ -23,19 +17,17 @@ socketio = SocketIO(app, async_mode='eventlet')
 
 @app.route('/')
 def index():
-    # This serves the index.html file
     return render_template('index.html')
 
-# --- 3. NEW: SOCKET.IO EVENT HANDLER ---
-# This function receives data from your farm_simulator.py
-@socketio.on('farm_update')
-# --- 3. NEW: SOCKET.IO EVENT HANDLER ---
-# This function receives data from your farm_simulator.py
+# --- 3. SOCKET.IO EVENT HANDLERS ---
+
 @socketio.on('farm_update')
 def handle_farm_update(data):
-
+    """
+    Receives data from the farm simulator and broadcasts
+    it to all other connected clients (the web browsers).
+    """
     print(f"Server received update from simulator: {data}")
-
     emit('farm_update', data, broadcast=True) 
        
     if 'soil' in data:
@@ -43,6 +35,17 @@ def handle_farm_update(data):
             socketio.start_background_task(send_alert, "critical")
         elif data['soil'] > (ALERT_LEVEL + 10):
             socketio.start_background_task(send_alert, "good")
+
+# --- NEW: Handler for the button press ---
+@socketio.on('run_pump_cycle')
+def handle_run_pump():
+    """
+    Receives a command from a browser.
+    Broadcasts a 'command_run_pump' event for the simulator to hear.
+    """
+    print("Server received 'run_pump_cycle' from browser.")
+    # Broadcast a *different* event name for the simulator to listen to
+    emit('command_run_pump', broadcast=True)
 
 @socketio.on('connect')
 def handle_connect():
@@ -53,11 +56,9 @@ def handle_disconnect():
     print('A client disconnected')
     
 # --- 4. ALERTING LOGIC (ntfy.sh) ---
-# --- 4. ALERTING LOGIC (ntfy.sh) ---
 def send_alert(alert_type="critical"):
     global last_alert_sent
     if alert_type == "critical" and not last_alert_sent:
-        # Set the flag *before* the request to prevent spam
         last_alert_sent = True
         print(f"ALERT! Soil is critical. Sending push notification...")
         try:
@@ -77,16 +78,10 @@ def send_alert(alert_type="critical"):
             
     elif alert_type == "good" and last_alert_sent:
         print("RESET! Soil is good again.")
-        last_alert_sent = False
+        last_alert_sent = False 
 
 # --- 5. RUN SERVER ---
 if __name__ == '__main__':
     print(f"Starting web server...")
-    # Use Render's PORT environment variable, default to 8080
     port = int(os.environ.get('PORT', 8080))
     socketio.run(app, host='0.0.0.0', port=port, debug=True)
-
-
-
-
-
