@@ -34,7 +34,6 @@
             background-color: #1E1E1E; border-radius: 12px;
             padding: 24px; margin: 15px; width: 300px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
         }
         .card h3 {
             margin-top: 0; font-size: 1.2rem; color: #AAAAAA;
@@ -69,36 +68,24 @@
             font-size: 1.5rem; color: #888; margin-top: 50px;
         }
         
-        /* --- Control Buttons --- */
-        #button-container {
-            display: flex; justify-content: space-between;
-        }
-        .control-button {
-            border: none; border-radius: 8px;
-            padding: 15px 20px; font-size: 1.1rem;
-            font-weight: 600; cursor: pointer;
-            width: 48%; transition: all 0.2s;
-        }
-        #btn-pump-on { background-color: #28a745; color: white; }
-        #btn-pump-on:hover { background-color: #218838; }
-        #btn-pump-off { background-color: #dc3545; color: white; }
-        #btn-pump-off:hover { background-color: #c82333; }
-        
         /* --- UPDATED: Plant Health List --- */
         #plant-list {
             list-style: none; padding-left: 0; margin-top: 10px;
         }
         #plant-list li {
             font-size: 1.2rem; margin-bottom: 15px;
-            padding-bottom: 10px;
+            padding-bottom: 15px;
             border-bottom: 1px solid #333;
         }
         #plant-list li:last-child {
             border-bottom: none; margin-bottom: 0;
         }
+        .plant-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 8px;
+        }
         .plant-name {
             font-size: 1.5rem; font-weight: 700;
-            display: block; margin-bottom: 8px;
         }
         .plant-status {
             font-size: 1.1rem; font-weight: 600;
@@ -111,6 +98,17 @@
         .status-good { color: #28a745; }
         .status-warn { color: #ffc107; }
         .status-crit { color: #dc3545; }
+        
+        /* --- NEW: Plant Water Button --- */
+        .water-button {
+            background-color: #007bff; color: white;
+            border: none; border-radius: 8px;
+            padding: 10px 15px; font-size: 0.9rem;
+            font-weight: 600; cursor: pointer;
+            width: 100%; transition: all 0.2s;
+            margin-top: 10px;
+        }
+        .water-button:hover { background-color: #0056b3; }
 
     </style>
 </head>
@@ -130,35 +128,36 @@
             </div>
 
             <div class="card" id="pump-card">
-                <h3>Pump Status</h3>
+                <h3>Main Pump</h3>
                 <div id="pump-status">--</div>
             </div>
             
-            <div class="card" id="control-card">
-                <h3>Manual Controls</h3>
-                <div id="button-container">
-                    <button id="btn-pump-on" class="control-button">ON</button>
-                    <button id="btn-pump-off" class="control-button">OFF</button>
-                </div>
-            </div>
-            
             <div class="card" id="plant-health-card">
-                <h3>Plant Health Status</h3>
+                <h3>Plant Health & Water</h3>
                 <ul id="plant-list">
                     <li>
-                        <span class="plant-name">🌱 Tomatoes</span>
-                        <span class="plant-status" id="plant-tomatoes-status">--</span>
+                        <div class="plant-header">
+                            <span class="plant-name">🌱 Tomatoes</span>
+                            <span class="plant-status" id="plant-tomatoes-status">--</span>
+                        </div>
                         <span class="plant-details" id="plant-tomatoes-detail">--</span>
+                        <button class="water-button" id="btn-water-tomatoes">Water Tomatoes</button>
                     </li>
                     <li>
-                        <span class="plant-name">🧅 Onion</span>
-                        <span class="plant-status" id="plant-onions-status">--</span>
+                        <div class="plant-header">
+                            <span class="plant-name">🧅 Onion</span>
+                            <span class="plant-status" id="plant-onions-status">--</span>
+                        </div>
                         <span class="plant-details" id="plant-onions-detail">--</span>
+                        <button class="water-button" id="btn-water-onions">Water Onion</button>
                     </li>
                     <li>
-                        <span class="plant-name">🌿 Mint</span>
-                        <span class="plant-status" id="plant-mint-status">--</span>
+                        <div class="plant-header">
+                            <span class="plant-name">🌿 Mint</span>
+                            <span class="plant-status" id="plant-mint-status">--</span>
+                        </div>
                         <span class="plant-details" id="plant-mint-detail">--</span>
+                        <button class="water-button" id="btn-water-mint">Water Mint</button>
                     </li>
                 </ul>
             </div>
@@ -178,16 +177,18 @@
         const soilText = document.getElementById('soil-text');
         const pumpStatus = document.getElementById('pump-status');
         
-        const btnPumpOn = document.getElementById('btn-pump-on');
-        const btnPumpOff = document.getElementById('btn-pump-off');
-        
-        // Find new plant health elements
+        // Find plant health elements
         const plantTomatoesStatus = document.getElementById('plant-tomatoes-status');
         const plantTomatoesDetail = document.getElementById('plant-tomatoes-detail');
         const plantOnionsStatus = document.getElementById('plant-onions-status');
         const plantOnionsDetail = document.getElementById('plant-onions-detail');
         const plantMintStatus = document.getElementById('plant-mint-status');
         const plantMintDetail = document.getElementById('plant-mint-detail');
+        
+        // Find new water buttons
+        const btnWaterTomatoes = document.getElementById('btn-water-tomatoes');
+        const btnWaterOnions = document.getElementById('btn-water-onions');
+        const btnWaterMint = document.getElementById('btn-water-mint');
         
         // --- Connect to Socket.IO ---
         const socket = io(); 
@@ -201,62 +202,48 @@
         function setStatus(element, status) {
             element.innerHTML = status;
             element.className = 'plant-status '; // reset
-            if (status === 'Good') {
-                element.classList.add('status-good');
-            } else if (status === 'Dry') {
-                element.classList.add('status-warn');
-            } else {
-                element.classList.add('status-crit');
-            }
+            if (status === 'Good') { element.classList.add('status-good'); }
+            else if (status === 'Dry') { element.classList.add('status-warn'); }
+            else { element.classList.add('status-crit'); }
         }
 
         // --- Listen for Farm Updates ---
         socket.on('farm_update', (data) => {
-            // data = { soil: 85, pump: "OFF", health: {...} }
+            // data = { soil_avg: 85, pump: "OFF", health: {...} }
             
             // --- Update Soil Card ---
-            const soil = data.soil;
+            const soil = data.soil_avg;
             soilPercent.innerHTML = `${soil}%`;
-            
-            if (soil > 70) {
-                soilText.innerHTML = 'Good';
-                soilCard.className = 'card good';
-            } else if (soil > 30) {
-                soilText.innerHTML = 'Dry';
-                soilCard.className = 'card warn';
-            } else {
-                soilText.innerHTML = 'Critical!';
-                soilCard.className = 'card crit';
-            }
+            if (soil > 70) { soilText.innerHTML = 'Good'; soilCard.className = 'card good'; }
+            else if (soil > 30) { soilText.innerHTML = 'Dry'; soilCard.className = 'card warn'; }
+            else { soilText.innerHTML = 'Critical!'; soilCard.className = 'card crit'; }
             
             // --- Update Pump Card ---
             const pump = data.pump;
-            if (pump === "ON") {
-                pumpStatus.innerHTML = 'ON';
-                pumpStatus.className = 'pump-on';
-            } else {
-                pumpStatus.innerHTML = 'OFF';
-                pumpStatus.className = 'pump-off';
-            }
+            if (pump === "ON") { pumpStatus.innerHTML = 'ON'; pumpStatus.className = 'pump-on'; }
+            else { pumpStatus.innerHTML = 'OFF'; pumpStatus.className = 'pump-off'; }
             
             // --- Update Plant Health Card ---
             const health = data.health;
             setStatus(plantTomatoesStatus, health.tomatoes.status);
-            plantTomatoesDetail.innerHTML = `Next water: ${health.tomatoes.next_water}`;
+            plantTomatoesDetail.innerHTML = `Humidity: ${health.tomatoes.soil}% | Next: ${health.tomatoes.next_water}`;
             
             setStatus(plantOnionsStatus, health.onions.status);
-            plantOnionsDetail.innerHTML = `Next water: ${health.onions.next_water}`;
+            plantOnionsDetail.innerHTML = `Humidity: ${health.onions.soil}% | Next: ${health.onions.next_water}`;
             
             setStatus(plantMintStatus, health.mint.status);
-            plantMintDetail.innerHTML = `Next water: ${health.mint.next_water}`;
+            plantMintDetail.innerHTML = `Humidity: ${health.mint.soil}% | Next: ${health.mint.next_water}`;
         });
         
         // --- Send Commands on Button Click ---
-        btnPumpOn.addEventListener('click', () => {
-            socket.emit('command', { 'pump': 'ON' }); 
+        btnWaterTomatoes.addEventListener('click', () => {
+            socket.emit('command_water', { 'plant': 'tomatoes' }); 
         });
-        btnPumpOff.addEventListener('click', () => {
-            socket.emit('command', { 'pump': 'OFF' }); 
+        btnWaterOnions.addEventListener('click', () => {
+            socket.emit('command_water', { 'plant': 'onions' }); 
+        });
+        btnWaterMint.addEventListener('click', () => {
+            socket.emit('command_water', { 'plant': 'mint' }); 
         });
 
         socket.on('disconnect', () => {
