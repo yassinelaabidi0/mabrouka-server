@@ -27,7 +27,7 @@ def handle_farm_update(data):
     Receives data from the farm simulator and broadcasts
     it to all other connected clients (the web browsers).
     """
-    print(f"Server received update from simulator: {data}")
+    # print(f"Server received update from simulator: {data}") # Commented out to reduce log spam
     emit('farm_update', data, broadcast=True) 
        
     if 'soil' in data:
@@ -36,16 +36,16 @@ def handle_farm_update(data):
         elif data['soil'] > (ALERT_LEVEL + 10):
             socketio.start_background_task(send_alert, "good")
 
-# --- NEW: Handler for the button press ---
-@socketio.on('run_pump_cycle')
-def handle_run_pump():
+# --- UPDATED: Handler for new buttons ---
+@socketio.on('command')
+def handle_command(data):
     """
-    Receives a command from a browser.
-    Broadcasts a 'command_run_pump' event for the simulator to hear.
+    Receives a command from a browser (e.g., { 'pump': 'ON' }).
+    Broadcasts a 'command_to_sim' event for the simulator to hear.
     """
-    print("Server received 'run_pump_cycle' from browser.")
+    print(f"Server received command from browser: {data}")
     # Broadcast a *different* event name for the simulator to listen to
-    emit('command_run_pump', broadcast=True)
+    emit('command_to_sim', data, broadcast=True)
 
 @socketio.on('connect')
 def handle_connect():
@@ -65,10 +65,8 @@ def send_alert(alert_type="critical"):
             requests.post(
                 ALERT_URL,
                 headers={
-                    "Title": "🚨 FARM ALERT! 🚨",
-                    "Priority": "5",
-                    "Tags": "rotating_light",
-                    "Click": APP_URL 
+                    "Title": "🚨 FARM ALERT! 🚨", "Priority": "5",
+                    "Tags": "rotating_light", "Click": APP_URL 
                 },
                 data="The soil is very dry! Please check the farm." 
             )
