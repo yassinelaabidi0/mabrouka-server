@@ -69,7 +69,7 @@
             font-size: 1.5rem; color: #888; margin-top: 50px;
         }
         
-        /* --- NEW: Control Buttons --- */
+        /* --- Control Buttons --- */
         #button-container {
             display: flex; justify-content: space-between;
         }
@@ -79,30 +79,38 @@
             font-weight: 600; cursor: pointer;
             width: 48%; transition: all 0.2s;
         }
-        #btn-pump-on {
-            background-color: #28a745; color: white;
-        }
+        #btn-pump-on { background-color: #28a745; color: white; }
         #btn-pump-on:hover { background-color: #218838; }
-        
-        #btn-pump-off {
-            background-color: #dc3545; color: white;
-        }
+        #btn-pump-off { background-color: #dc3545; color: white; }
         #btn-pump-off:hover { background-color: #c82333; }
         
-        /* --- NEW: Prediction List --- */
-        #prediction-list {
+        /* --- UPDATED: Plant Health List --- */
+        #plant-list {
             list-style: none; padding-left: 0; margin-top: 10px;
         }
-        #prediction-list li {
+        #plant-list li {
             font-size: 1.2rem; margin-bottom: 15px;
-            display: flex; justify-content: space-between;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
         }
-        #prediction-list li span:first-child {
-            font-weight: 600;
+        #plant-list li:last-child {
+            border-bottom: none; margin-bottom: 0;
         }
-        #prediction-list li span:last-child {
-            color: #AAAAAA;
+        .plant-name {
+            font-size: 1.5rem; font-weight: 700;
+            display: block; margin-bottom: 8px;
         }
+        .plant-status {
+            font-size: 1.1rem; font-weight: 600;
+        }
+        .plant-details {
+            font-size: 1rem; color: #AAAAAA;
+        }
+        
+        /* Dynamic Status Colors */
+        .status-good { color: #28a745; }
+        .status-warn { color: #ffc107; }
+        .status-crit { color: #dc3545; }
 
     </style>
 </head>
@@ -116,7 +124,7 @@
         <div id="card-container" style="display: none;">
             
             <div class="card" id="soil-card">
-                <h3>Soil Humidity</h3>
+                <h3>Overall Humidity</h3>
                 <div id="soil-percent">--%</div>
                 <div id="soil-text">--</div>
             </div>
@@ -134,12 +142,24 @@
                 </div>
             </div>
             
-            <div class="card" id="prediction-card">
-                <h3>Predictions</h3>
-                <ul id="prediction-list">
-                    <li><span>Tomatoes</span> <span id="pred-tomatoes">--</span></li>
-                    <li><span>Onion</span> <span id="pred-onions">--</span></li>
-                    <li><span>Mint</span> <span id="pred-mint">--</span></li>
+            <div class="card" id="plant-health-card">
+                <h3>Plant Health Status</h3>
+                <ul id="plant-list">
+                    <li>
+                        <span class="plant-name">🌱 Tomatoes</span>
+                        <span class="plant-status" id="plant-tomatoes-status">--</span>
+                        <span class="plant-details" id="plant-tomatoes-detail">--</span>
+                    </li>
+                    <li>
+                        <span class="plant-name">🧅 Onion</span>
+                        <span class="plant-status" id="plant-onions-status">--</span>
+                        <span class="plant-details" id="plant-onions-detail">--</span>
+                    </li>
+                    <li>
+                        <span class="plant-name">🌿 Mint</span>
+                        <span class="plant-status" id="plant-mint-status">--</span>
+                        <span class="plant-details" id="plant-mint-detail">--</span>
+                    </li>
                 </ul>
             </div>
 
@@ -156,15 +176,18 @@
         const soilCard = document.getElementById('soil-card');
         const soilPercent = document.getElementById('soil-percent');
         const soilText = document.getElementById('soil-text');
-        
         const pumpStatus = document.getElementById('pump-status');
         
         const btnPumpOn = document.getElementById('btn-pump-on');
         const btnPumpOff = document.getElementById('btn-pump-off');
         
-        const predTomatoes = document.getElementById('pred-tomatoes');
-        const predOnions = document.getElementById('pred-onions');
-        const predMint = document.getElementById('pred-mint');
+        // Find new plant health elements
+        const plantTomatoesStatus = document.getElementById('plant-tomatoes-status');
+        const plantTomatoesDetail = document.getElementById('plant-tomatoes-detail');
+        const plantOnionsStatus = document.getElementById('plant-onions-status');
+        const plantOnionsDetail = document.getElementById('plant-onions-detail');
+        const plantMintStatus = document.getElementById('plant-mint-status');
+        const plantMintDetail = document.getElementById('plant-mint-detail');
         
         // --- Connect to Socket.IO ---
         const socket = io(); 
@@ -174,9 +197,22 @@
             cardContainer.style.display = 'flex';
         });
 
+        // Helper function for status styling
+        function setStatus(element, status) {
+            element.innerHTML = status;
+            element.className = 'plant-status '; // reset
+            if (status === 'Good') {
+                element.classList.add('status-good');
+            } else if (status === 'Dry') {
+                element.classList.add('status-warn');
+            } else {
+                element.classList.add('status-crit');
+            }
+        }
+
         // --- Listen for Farm Updates ---
         socket.on('farm_update', (data) => {
-            // data = { soil: 85, pump: "OFF", predictions: {...} }
+            // data = { soil: 85, pump: "OFF", health: {...} }
             
             // --- Update Soil Card ---
             const soil = data.soil;
@@ -203,21 +239,23 @@
                 pumpStatus.className = 'pump-off';
             }
             
-            // --- Update Prediction Card ---
-            const preds = data.predictions;
-            predTomatoes.innerHTML = preds.tomatoes;
-            predOnions.innerHTML = preds.onions;
-            predMint.innerHTML = preds.mint;
+            // --- Update Plant Health Card ---
+            const health = data.health;
+            setStatus(plantTomatoesStatus, health.tomatoes.status);
+            plantTomatoesDetail.innerHTML = `Next water: ${health.tomatoes.next_water}`;
+            
+            setStatus(plantOnionsStatus, health.onions.status);
+            plantOnionsDetail.innerHTML = `Next water: ${health.onions.next_water}`;
+            
+            setStatus(plantMintStatus, health.mint.status);
+            plantMintDetail.innerHTML = `Next water: ${health.mint.next_water}`;
         });
         
         // --- Send Commands on Button Click ---
         btnPumpOn.addEventListener('click', () => {
-            console.log('Sending command: Pump ON');
             socket.emit('command', { 'pump': 'ON' }); 
         });
-        
         btnPumpOff.addEventListener('click', () => {
-            console.log('Sending command: Pump OFF');
             socket.emit('command', { 'pump': 'OFF' }); 
         });
 
