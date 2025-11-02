@@ -2,255 +2,500 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Mabrouka's Farm Control</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Farm Dashboard</title>
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- 2. Add Google Font (Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- 3. Configure Tailwind to use Inter font -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'farm-bg': '#181f2a', // A dark slate-blue bg
+                        'farm-card': '#2a3346', // A lighter card bg
+                        'farm-card-dark': '#222b3c',
+                        'farm-accent-blue': '#3b82f6',
+                        'farm-accent-green': '#22c55e',
+                        'farm-accent-red': '#ef4444',
+                        'farm-accent-yellow': '#eab308',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- 4. Custom styles for scrollbar (optional, matches theme) -->
     <style>
-        html, body {
-            margin: 0; padding: 0; width: 100%;
+        body {
             font-family: 'Inter', sans-serif;
-            overflow: auto;
-            background-color: #121212;
-            color: #FFFFFF;
+            background-color: #181f2a; /* farm-bg */
         }
-        #dashboard-container {
+        /* Simple, dark scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #2a3346; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        /* Loading Spinner */
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(24, 31, 42, 0.8); /* farm-bg with opacity */
             display: flex; flex-direction: column;
-            align-items: center; padding: 20px; box-sizing: border-box;
+            justify-content: center; align-items: center;
+            z-index: 9999; transition: opacity 0.3s;
         }
-        h1 {
-            font-weight: 600; font-size: 2.5rem; margin-bottom: 30px;
+        .spinner {
+            width: 56px; height: 56px;
+            border: 6px solid #4b5563;
+            border-bottom-color: #fff;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
         }
-        #card-container {
-            display: flex; flex-wrap: wrap;
-            justify-content: center; width: 100%;
-        }
-        .card {
-            background-color: #1E1E1E; border-radius: 12px;
-            padding: 24px; margin: 15px; width: 300px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        .card h3 {
-            margin-top: 0; font-size: 1.2rem; color: #AAAAAA;
-            text-transform: uppercase; letter-spacing: 0.5px;
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
-        /* --- Status Elements --- */
-        #soil-percent {
-            font-size: 4.5rem; font-weight: 700;
-            line-height: 1; margin-top: 10px;
-        }
-        #soil-text {
-            font-size: 1.5rem; font-weight: 600;
-        }
-        #pump-status {
-            font-size: 3.5rem; font-weight: 700;
-            margin-top: 10px; line-height: 1.2;
-        }
+        /* Classes to be toggled by JS */
+        .status-ok { color: #22c55e; } /* farm-accent-green */
+        .status-warning { color: #eab308; } /* farm-accent-yellow */
+        .status-critical { color: #ef4444; } /* farm-accent-red */
         
-        /* --- Dynamic Colors --- */
-        .good { border-left: 5px solid #28a745; }
-        .good #soil-percent, .good #soil-text { color: #28a745; }
-        .warn { border-left: 5px solid #ffc107; }
-        .warn #soil-percent, .warn #soil-text { color: #ffc107; }
-        .crit { border-left: 5px solid #dc3545; }
-        .crit #soil-percent, .crit #soil-text { color: #dc3545; }
-
-        .pump-on { color: #007bff; }
-        .pump-off { color: #888888; }
-        
-        #loading {
-            font-size: 1.5rem; color: #888; margin-top: 50px;
-        }
-        
-        /* --- UPDATED: Plant Health List --- */
-        #plant-list {
-            list-style: none; padding-left: 0; margin-top: 10px;
-        }
-        #plant-list li {
-            font-size: 1.2rem; margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #333;
-        }
-        #plant-list li:last-child {
-            border-bottom: none; margin-bottom: 0;
-        }
-        .plant-header {
-            display: flex; justify-content: space-between;
-            align-items: center; margin-bottom: 8px;
-        }
-        .plant-name {
-            font-size: 1.5rem; font-weight: 700;
-        }
-        .plant-status {
-            font-size: 1.1rem; font-weight: 600;
-        }
-        .plant-details {
-            font-size: 1rem; color: #AAAAAA;
-        }
-        
-        /* Dynamic Status Colors */
-        .status-good { color: #28a745; }
-        .status-warn { color: #ffc107; }
-        .status-crit { color: #dc3545; }
-        
-        /* --- NEW: Plant Water Button --- */
-        .water-button {
-            background-color: #007bff; color: white;
-            border: none; border-radius: 8px;
-            padding: 10px 15px; font-size: 0.9rem;
-            font-weight: 600; cursor: pointer;
-            width: 100%; transition: all 0.2s;
-            margin-top: 10px;
-        }
-        .water-button:hover { background-color: #0056b3; }
+        .bg-status-blue { background-color: #3b82f6; }
+        .bg-status-green { background-color: #22c55e; }
+        .bg-status-yellow { background-color: #eab308; }
+        .bg-status-red { background-color: #ef4444; }
 
     </style>
 </head>
-<body>
-    
-    <div id="dashboard-container">
-        <h1>Mabrouka's Farm</h1>
-        
-        <div id="loading">Connecting to farm...</div>
+<body class="bg-farm-bg text-gray-200 p-4 md:p-8">
 
-        <div id="card-container" style="display: none;">
-            
-            <div class="card" id="soil-card">
-                <h3>Overall Humidity</h3>
-                <div id="soil-percent">--%</div>
-                <div id="soil-text">--</div>
-            </div>
-
-            <div class="card" id="pump-card">
-                <h3>Main Pump</h3>
-                <div id="pump-status">--</div>
-            </div>
-            
-            <div class="card" id="plant-health-card">
-                <h3>Plant Health & Water</h3>
-                <ul id="plant-list">
-                    <li>
-                        <div class="plant-header">
-                            <span class="plant-name">🌱 Tomatoes</span>
-                            <span class="plant-status" id="plant-tomatoes-status">--</span>
-                        </div>
-                        <span class="plant-details" id="plant-tomatoes-detail">--</span>
-                        <button class="water-button" id="btn-water-tomatoes">Water Tomatoes</button>
-                    </li>
-                    <li>
-                        <div class="plant-header">
-                            <span class="plant-name">🧅 Onion</span>
-                            <span class="plant-status" id="plant-onions-status">--</span>
-                        </div>
-                        <span class="plant-details" id="plant-onions-detail">--</span>
-                        <button class="water-button" id="btn-water-onions">Water Onion</button>
-                    </li>
-                    <li>
-                        <div class="plant-header">
-                            <span class="plant-name">🌿 Mint</span>
-                            <span class="plant-status" id="plant-mint-status">--</span>
-                        </div>
-                        <span class="plant-details" id="plant-mint-detail">--</span>
-                        <button class="water-button" id="btn-water-mint">Water Mint</button>
-                    </li>
-                </ul>
-            </div>
-
-        </div>
+    <!-- == LOADING OVERLAY (Added) == -->
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p class="text-xl text-white font-semibold mt-4">Connecting to farm...</p>
     </div>
 
+    <div class="max-w-7xl mx-auto">
+
+        <!-- == HEADER == -->
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">Smart Farm Dashboard</h1>
+            <p class="text-lg text-gray-400 mt-1">Real-time monitoring for a healthy harvest.</p>
+        </header>
+
+        <!-- == MAIN CONTENT GRID == -->
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+
+            <!-- == LEFT COLUMN: Weather & Irrigation == -->
+            <section class="bg-farm-card p-6 rounded-2xl shadow-lg flex flex-col gap-6">
+                <h2 class="text-2xl font-semibold text-white">Weather & Irrigation Plan</h2>
+                
+                <!-- Weather Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <!-- Today -->
+                    <div class="bg-farm-card-dark p-6 rounded-xl flex flex-col items-center justify-center text-center">
+                        <h3 class="text-lg font-medium text-gray-300 mb-4">Today</h3>
+                        <!-- Icon (will be changed by JS) -->
+                        <div id="weather-today-icon">
+                            <svg class="w-16 h-16 text-yellow-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-6.364-.386l1.591-1.591M3 12h2.25m.386-6.364l1.591 1.591M12 12a6 6 0 110 12 6 6 0 010-12z" />
+                            </svg>
+                        </div>
+                        <p id="weather-today-temp" class="text-4xl font-bold text-white">--°C</p>
+                        <p class="text-md text-gray-400 mt-1">Rain: <span id="weather-today-rain">--</span>%</p>
+                    </div>
+                    
+                    <!-- Tomorrow -->
+                    <div class="bg-farm-card-dark p-6 rounded-xl flex flex-col items-center justify-center text-center">
+                        <h3 class="text-lg font-medium text-gray-300 mb-4">Tomorrow</h3>
+                        <!-- Icon (will be changed by JS) -->
+                        <div id="weather-tomorrow-icon">
+                            <svg class="w-16 h-16 text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.758A3.75 3.75 0 0011.25 6c-1.258 0-2.417.394-3.374 1.069a4.5 4.5 0 00-3.374 4.168V15z" />
+                            </svg>
+                        </div>
+                        <p id="weather-tomorrow-temp" class="text-4xl font-bold text-white">--°C</p>
+                        <p class="text-md text-gray-400 mt-1">Rain: <span id="weather-tomorrow-rain">--</span>%</p>
+                    </div>
+                </div>
+                
+                <!-- Irrigation Status Bar -->
+                <div id="irrigation-status-bar" class="bg-farm-accent-blue text-white p-4 rounded-lg text-center transition-colors duration-300">
+                    <p id="irrigation-status-text" class="font-medium">Connecting to server...</p>
+                </div>
+            </section>
+
+            <!-- == RIGHT COLUMN: Pump Status == -->
+            <section class="bg-farm-card p-6 rounded-2xl shadow-lg flex flex-col gap-6">
+                <h2 class="text-2xl font-semibold text-white">Pump Status</h2>
+                
+                <!-- Pump Status Card -->
+                <div class="bg-farm-card-dark p-6 rounded-xl flex items-center gap-4">
+                    <!-- Icon Placeholder -->
+                    <div id="pump-icon-bg" class="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center text-lg font-bold text-gray-300 flex-shrink-0">DG</div>
+                    <div>
+                        <p id="pump-status-text" class="text-xl font-semibold text-white">--</p>
+                        <p id="pump-status-reason" class="text-md text-gray-400">Connecting...</p>
+                    </div>
+                </div>
+                
+                <!-- Sensor Readings -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div class="bg-farm-card-dark p-4 rounded-xl flex items-center gap-4">
+                        <!-- Temp Icon -->
+                        <svg class="w-8 h-8 text-red-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0118 8.25c0 3.866-3.582 7-8 7s-8-3.134-8-7c0-1.933.794-3.714 2.088-4.962l.044-.044m1.96 0A8.25 8.25 0 0110 3.75c2.056 0 3.96.784 5.362 2.088m-5.362 2.088a3 3 0 11-4.242 0m4.242 0a3 3 0 010 4.242m-4.242-4.242a3 3 0 014.242 0" />
+                        </svg>
+                        <div>
+                            <p class="text-sm text-gray-400">Temp</p>
+                            <p id="pump-temp" class="text-xl font-bold text-white">--°C</p>
+                        </div>
+                    </div>
+                    <div class="bg-farm-card-dark p-4 rounded-xl flex items-center gap-4">
+                        <!-- Pressure Icon -->
+                        <svg class="w-8 h-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3v-1.5m0 1.5h16.5m0 0V3m0 0h-1.5m1.5 0v11.25A2.25 2.25 0 0118 16.5h-1.5m-15 0H3m15 0v-2.25m0 2.25h-1.5m1.5 0V3m0 0h-1.5M3 16.5v-2.25m0 2.25h1.5M3 16.5H1.5m1.5 0v-2.25m15 2.25v-2.25m0 2.25h1.5m-1.5 0v-2.25m0 2.25V15m0 1.5V15m0 0H18m1.5 1.5h-1.5M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <div>
+                            <p class="text-sm text-gray-400">Pressure</p>
+                            <p id="pump-pressure" class="text-xl font-bold text-white">-- PSI</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Manual Controls -->
+                <div>
+                    <h3 class="text-md font-medium text-gray-300 mb-3">Manual Controls</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <button id="btn-force-start" class="bg-farm-accent-green text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-500 transition-colors duration-200 disabled:opacity-50">
+                            Force Start
+                        </button>
+                        <button id="btn-force-stop" class="bg-farm-accent-red text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-red-500 transition-colors duration-200 disabled:opacity-50">
+                            Force Stop
+                        </button>
+                        <button id="btn-set-auto" class="bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-gray-400 transition-colors duration-200">
+                            Set Auto
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- == FULL WIDTH ROW: Plant Health Status == -->
+            <section class="lg:col-span-2 bg-farm-card p-6 rounded-2xl shadow-lg">
+                <h2 class="text-2xl font-semibold text-white mb-6">Plant Health Status</h2>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                    
+                    <!-- Plant Card: Tomato -->
+                    <div class="bg-farm-card-dark rounded-2xl overflow-hidden shadow-lg">
+                        <div class="bg-red-600 h-32 flex items-center justify-center text-6xl">🍅</div>
+                        <div class="p-4 flex flex-col gap-3">
+                            <h3 class="text-lg font-semibold text-white">Tomato Patch A</h3>
+                            <p class="text-sm text-gray-400">Overall Status: <span id="plant-tomato-status" class="font-medium">--</span></p>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Humidity</span>
+                                <span id="plant-tomato-humidity" class="font-bold text-white">--%</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Temperature</span>
+                                <span id="plant-tomato-temp" class="font-bold text-white">--°C</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Salinity</span>
+                                <span id="plant-tomato-salinity" class="font-bold text-white">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Plant Card: Pepper -->
+                    <div class="bg-farm-card-dark rounded-2xl overflow-hidden shadow-lg">
+                        <div class="bg-green-600 h-32 flex items-center justify-center text-6xl">🌶️</div>
+                        <div class="p-4 flex flex-col gap-3">
+                            <h3 class="text-lg font-semibold text-white">Pepper Field</h3>
+                            <p class="text-sm text-gray-400">Overall Status: <span id="plant-pepper-status" class="font-medium">--</span></p>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Humidity</span>
+                                <span id="plant-pepper-humidity" class="font-bold text-white">--%</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Temperature</span>
+                                <span id="plant-pepper-temp" class="font-bold text-white">--°C</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Salinity</span>
+                                <span id="plant-pepper-salinity" class="font-bold text-white">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Plant Card: Cucumber -->
+                    <div class="bg-farm-card-dark rounded-2xl overflow-hidden shadow-lg">
+                        <div class="bg-green-800 h-32 flex items-center justify-center text-6xl">🥒</div>
+                        <div class="p-4 flex flex-col gap-3">
+                            <h3 class="text-lg font-semibold text-white">Cucumber Vines</h3>
+                            <p class="text-sm text-gray-400">Overall Status: <span id="plant-cucumber-status" class="font-medium">--</span></p>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Humidity</span>
+                                <span id="plant-cucumber-humidity" class="font-bold text-white">--%</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Temperature</span>
+                                <span id="plant-cucumber-temp" class="font-bold text-white">--°C</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Salinity</span>
+                                <span id="plant-cucumber-salinity" class="font-bold text-white">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Plant Card: Onion -->
+                    <div class="bg-farm-card-dark rounded-2xl overflow-hidden shadow-lg">
+                        <div class="bg-purple-600 h-32 flex items-center justify-center text-6xl">🧅</div>
+                        <div class="p-4 flex flex-col gap-3">
+                            <h3 class="text-lg font-semibold text-white">Onion Rows</h3>
+                            <p class="text-sm text-gray-400">Overall Status: <span id="plant-onion-status" class="font-medium">--</span></p>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Humidity</span>
+                                <span id="plant-onion-humidity" class="font-bold text-white">--%</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Temperature</span>
+                                <span id="plant-onion-temp" class="font-bold text-white">--°C</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Salinity</span>
+                                <span id="plant-onion-salinity" class="font-bold text-white">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Plant Card: Pumpkin -->
+                    <div class="bg-farm-card-dark rounded-2xl overflow-hidden shadow-lg">
+                        <div class="bg-orange-600 h-32 flex items-center justify-center text-6xl">🎃</div>
+                        <div class="p-4 flex flex-col gap-3">
+                            <h3 class="text-lg font-semibold text-white">Pumpkin Patch</h3>
+                            <p class="text-sm text-gray-400">Overall Status: <span id="plant-pumpkin-status" class="font-medium">--</span></p>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Humidity</span>
+                                <span id="plant-pumpkin-humidity" class="font-bold text-white">--%</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Temperature</span>
+                                <span id="plant-pumpkin-temp" class="font-bold text-white">--°C</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-400 flex items-center gap-1.5">... Salinity</span>
+                                <span id="plant-pumpkin-salinity" class="font-bold text-white">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+        </main>
+        
+        <!-- Footer -->
+        <footer class="text-center mt-12 text-gray-500 text-sm">
+            <p>Smart Farm Dashboard &copy; 2025. All data is simulated.</p>
+        </footer>
+
+    </div>
+
+    <!-- == JAVASCRIPT SECTION == -->
+    
+    <!-- 1. Load Socket.IO Client Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     
+    <!-- 2. Our Custom Client-Side Logic -->
     <script>
-        // --- Find Elements ---
-        const loading = document.getElementById('loading');
-        const cardContainer = document.getElementById('card-container');
+        // --- Get All Elements ---
+        const loadingOverlay = document.getElementById('loading-overlay');
         
-        const soilCard = document.getElementById('soil-card');
-        const soilPercent = document.getElementById('soil-percent');
-        const soilText = document.getElementById('soil-text');
-        const pumpStatus = document.getElementById('pump-status');
+        // Weather
+        const weatherTodayTemp = document.getElementById('weather-today-temp');
+        const weatherTodayRain = document.getElementById('weather-today-rain');
+        const weatherTodayIcon = document.getElementById('weather-today-icon');
+        const weatherTomorrowTemp = document.getElementById('weather-tomorrow-temp');
+        const weatherTomorrowRain = document.getElementById('weather-tomorrow-rain');
+        const weatherTomorrowIcon = document.getElementById('weather-tomorrow-icon');
         
-        // Find plant health elements
-        const plantTomatoesStatus = document.getElementById('plant-tomatoes-status');
-        const plantTomatoesDetail = document.getElementById('plant-tomatoes-detail');
-        const plantOnionsStatus = document.getElementById('plant-onions-status');
-        const plantOnionsDetail = document.getElementById('plant-onions-detail');
-        const plantMintStatus = document.getElementById('plant-mint-status');
-        const plantMintDetail = document.getElementById('plant-mint-detail');
+        // Irrigation
+        const irrigationStatusBar = document.getElementById('irrigation-status-bar');
+        const irrigationStatusText = document.getElementById('irrigation-status-text');
         
-        // Find new water buttons
-        const btnWaterTomatoes = document.getElementById('btn-water-tomatoes');
-        const btnWaterOnions = document.getElementById('btn-water-onions');
-        const btnWaterMint = document.getElementById('btn-water-mint');
+        // Pump
+        const pumpIconBg = document.getElementById('pump-icon-bg');
+        const pumpStatusText = document.getElementById('pump-status-text');
+        const pumpStatusReason = document.getElementById('pump-status-reason');
+        const pumpTemp = document.getElementById('pump-temp');
+        const pumpPressure = document.getElementById('pump-pressure');
+        const btnForceStart = document.getElementById('btn-force-start');
+        const btnForceStop = document.getElementById('btn-force-stop');
+        const btnSetAuto = document.getElementById('btn-set-auto');
         
-        // --- Connect to Socket.IO ---
-        const socket = io(); 
+        // Plant Elements
+        const plantElements = {
+            tomato: {
+                status: document.getElementById('plant-tomato-status'),
+                humidity: document.getElementById('plant-tomato-humidity'),
+                temp: document.getElementById('plant-tomato-temp'),
+                salinity: document.getElementById('plant-tomato-salinity'),
+            },
+            pepper: {
+                status: document.getElementById('plant-pepper-status'),
+                humidity: document.getElementById('plant-pepper-humidity'),
+                temp: document.getElementById('plant-pepper-temp'),
+                salinity: document.getElementById('plant-pepper-salinity'),
+            },
+            cucumber: {
+                status: document.getElementById('plant-cucumber-status'),
+                humidity: document.getElementById('plant-cucumber-humidity'),
+                temp: document.getElementById('plant-cucumber-temp'),
+                salinity: document.getElementById('plant-cucumber-salinity'),
+            },
+            onion: {
+                status: document.getElementById('plant-onion-status'),
+                humidity: document.getElementById('plant-onion-humidity'),
+                temp: document.getElementById('plant-onion-temp'),
+                salinity: document.getElementById('plant-onion-salinity'),
+            },
+            pumpkin: {
+                status: document.getElementById('plant-pumpkin-status'),
+                humidity: document.getElementById('plant-pumpkin-humidity'),
+                temp: document.getElementById('plant-pumpkin-temp'),
+                salinity: document.getElementById('plant-pumpkin-salinity'),
+            }
+        };
 
-        socket.on('connect', () => {
-            loading.style.display = 'none';
-            cardContainer.style.display = 'flex';
-        });
+        // --- Weather Icon SVGs ---
+        const icons = {
+            sun: `<svg class="w-16 h-16 text-yellow-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-6.364-.386l1.591-1.591M3 12h2.25m.386-6.364l1.591 1.591M12 12a6 6 0 110 12 6 6 0 010-12z" /></svg>`,
+            cloud: `<svg class="w-16 h-16 text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.758A3.75 3.75 0 0011.25 6c-1.258 0-2.417.394-3.374 1.069a4.5 4.5 0 00-3.374 4.168V15z" /></svg>`,
+            rain: `<svg class="w-16 h-16 text-blue-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h.008v.008H12v-.008zM10.5 16.5l-1.5-3-1.5 3h3z" /></svg>` // Placeholder rain icon
+        };
 
-        // Helper function for status styling
-        function setStatus(element, status) {
-            element.innerHTML = status;
-            element.className = 'plant-status '; // reset
-            if (status === 'Good') { element.classList.add('status-good'); }
-            else if (status === 'Dry') { element.classList.add('status-warn'); }
-            else { element.classList.add('status-crit'); }
+        // --- Helper Functions ---
+        function updateText(element, value) {
+            if (element && element.innerHTML !== value) {
+                element.innerHTML = value;
+            }
         }
 
-        // --- Listen for Farm Updates ---
-        socket.on('farm_update', (data) => {
-            // data = { soil_avg: 85, pump: "OFF", health: {...} }
-            
-            // --- Update Soil Card ---
-            const soil = data.soil_avg;
-            soilPercent.innerHTML = `${soil}%`;
-            if (soil > 70) { soilText.innerHTML = 'Good'; soilCard.className = 'card good'; }
-            else if (soil > 30) { soilText.innerHTML = 'Dry'; soilCard.className = 'card warn'; }
-            else { soilText.innerHTML = 'Critical!'; soilCard.className = 'card crit'; }
-            
-            // --- Update Pump Card ---
-            const pump = data.pump;
-            if (pump === "ON") { pumpStatus.innerHTML = 'ON'; pumpStatus.className = 'pump-on'; }
-            else { pumpStatus.innerHTML = 'OFF'; pumpStatus.className = 'pump-off'; }
-            
-            // --- Update Plant Health Card ---
-            const health = data.health;
-            setStatus(plantTomatoesStatus, health.tomatoes.status);
-            plantTomatoesDetail.innerHTML = `Humidity: ${health.tomatoes.soil}% | Next: ${health.tomatoes.next_water}`;
-            
-            setStatus(plantOnionsStatus, health.onions.status);
-            plantOnionsDetail.innerHTML = `Humidity: ${health.onions.soil}% | Next: ${health.onions.next_water}`;
-            
-            setStatus(plantMintStatus, health.mint.status);
-            plantMintDetail.innerHTML = `Humidity: ${health.mint.soil}% | Next: ${health.mint.next_water}`;
-        });
-        
-        // --- Send Commands on Button Click ---
-        btnWaterTomatoes.addEventListener('click', () => {
-            socket.emit('command_water', { 'plant': 'tomatoes' }); 
-        });
-        btnWaterOnions.addEventListener('click', () => {
-            socket.emit('command_water', { 'plant': 'onions' }); 
-        });
-        btnWaterMint.addEventListener('click', () => {
-            socket.emit('command_water', { 'plant': 'mint' }); 
+        function updateStatusClass(element, status) {
+            element.classList.remove('status-ok', 'status-warning', 'status-critical');
+            if (status === 'OK') element.classList.add('status-ok');
+            else if (status === 'Warning') element.classList.add('status-warning');
+            else if (status === 'Critical') element.classList.add('status-critical');
+        }
+
+        function updateIrrigationBar(text, color) {
+            updateText(irrigationStatusText, text);
+            irrigationStatusBar.classList.remove('bg-status-blue', 'bg-status-green', 'bg-status-yellow', 'bg-status-red');
+            if (color === 'blue') irrigationStatusBar.classList.add('bg-status-blue');
+            else if (color === 'green') irrigationStatusBar.classList.add('bg-status-green');
+            else if (color === 'yellow') irrigationStatusBar.classList.add('bg-status-yellow');
+            else if (color === 'red') irrigationStatusBar.classList.add('bg-status-red');
+        }
+
+        // --- Connect to Socket.IO ---
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('Connected to server!');
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => { loadingOverlay.style.display = 'none'; }, 300);
         });
 
         socket.on('disconnect', () => {
-            loading.innerHTML = 'Reconnecting...';
-            loading.style.display = 'block';
-            cardContainer.style.display = 'none';
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.opacity = '1';
+            updateText(loadingOverlay.querySelector('p'), 'Connection lost. Reconnecting...');
         });
+
+        // --- THE MAIN UPDATE FUNCTION ---
+        socket.on('farm_update', (data) => {
+            // console.log('Received data:', data); // Uncomment for debugging
+            
+            // 1. Update Weather
+            updateText(weatherTodayTemp, `${data.weather.today.temp}°C`);
+            updateText(weatherTodayRain, `${data.weather.today.rain}%`);
+            updateText(weatherTodayIcon, icons[data.weather.today.icon] || icons.sun);
+            updateText(weatherTomorrowTemp, `${data.weather.tomorrow.temp}°C`);
+            updateText(weatherTomorrowRain, `${data.weather.tomorrow.rain}%`);
+            updateText(weatherTomorrowIcon, icons[data.weather.tomorrow.icon] || icons.cloud);
+
+            // 2. Update Irrigation Bar
+            updateIrrigationBar(data.irrigation.text, data.irrigation.color);
+            
+            // 3. Update Pump
+            updateText(pumpStatusText, `Pump is ${data.pump.state}`);
+            updateText(pumpStatusReason, data.pump.reason);
+            updateText(pumpTemp, `${data.pump.temp}°C`);
+            updateText(pumpPressure, `${data.pump.pressure} PSI`);
+            
+            // Update pump buttons based on state
+            if (data.pump.state === 'ON') {
+                pumpIconBg.classList.add('animate-pulse', 'bg-farm-accent-green');
+                pumpIconBg.classList.remove('bg-gray-600');
+                btnForceStart.disabled = true;
+                btnForceStop.disabled = false;
+            } else { // OFF
+                pumpIconBg.classList.remove('animate-pulse', 'bg-farm-accent-green');
+                pumpIconBg.classList.add('bg-gray-600');
+                btnForceStart.disabled = false;
+                btnForceStop.disabled = true;
+            }
+            // Update auto button
+            if (data.pump.manualOverride) {
+                btnSetAuto.classList.add('bg-farm-accent-blue');
+                btnSetAuto.classList.remove('bg-gray-500');
+            } else {
+                btnSetAuto.classList.remove('bg-farm-accent-blue');
+                btnSetAuto.classList.add('bg-gray-500');
+            }
+
+            // 4. Update Plants
+            for (const plantName in plantElements) {
+                const els = plantElements[plantName];
+                const plantData = data.plants[plantName];
+                if (els && plantData) {
+                    updateText(els.status, plantData.status);
+                    updateStatusClass(els.status, plantData.status);
+                    updateText(els.humidity, `${plantData.humidity}%`);
+                    updateText(els.temp, `${plantData.temp}°C`);
+                    updateText(els.salinity, plantData.salinity);
+                }
+            }
+        });
+
+        // --- Add Button Listeners ---
+        btnForceStart.addEventListener('click', () => {
+            socket.emit('command_force_start');
+        });
+        
+        btnForceStop.addEventListener('click', () => {
+            socket.emit('command_force_stop');
+        });
+
+        btnSetAuto.addEventListener('click', () => {
+            socket.emit('command_set_auto');
+        });
+        
     </script>
 </body>
 </html>
