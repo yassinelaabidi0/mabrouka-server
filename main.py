@@ -18,7 +18,7 @@ ALERT_URL = f"https://ntfy.sh/{ALERT_TOPIC_NAME}"
 last_alert_sent = False
 
 # --- 2. FLASK & SOCKET.IO SETUP ---
-app = Flask(__name__)
+app = Flask(__name__, template_folder='.')
 socketio = SocketIO(app, async_mode='eventlet') 
 
 @app.route('/')
@@ -90,6 +90,7 @@ if __name__ == '__main__':
     # Use Render's PORT environment variable, default to 8080
     port = int(os.environ.get('PORT', 8080))
     socketio.run(app, host='0.0.0.0', port=port, debug=True)
+
 
 
 
