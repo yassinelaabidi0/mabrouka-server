@@ -1,84 +1,177 @@
+import time
+import random
+import os
 from flask import Flask, render_template
-from flask_socketio import SocketIO, emit
-import requests
-import threading
-import os 
+from flask_socketio import SocketIO
+import eventlet
 
-# --- 1. CONFIGURATION ---
-ALERT_LEVEL = 30 
-APP_URL = "https://mabrouka-server.onrender.com" 
-ALERT_TOPIC_NAME = "mabrouka-farm-alert-team-XYZ"
-ALERT_URL = f"https://ntfy.sh/{ALERT_TOPIC_NAME}"
-last_alert_sent = False
+# We must patch the standard library for eventlet to work
+eventlet.monkey_patch()
 
-# --- 2. FLASK & SOCKET.IO SETUP ---
+# --- 1. FLASK & SOCKET.IO SETUP ---
 app = Flask(__name__, template_folder='.')
-socketio = SocketIO(app, async_mode='eventlet') 
+socketio = SocketIO(app, async_mode='eventlet')
+
+# --- 2. SIMULATION STATE ---
+# This is the "database" of our farm, matching your new 5 plants
+plant_zones = {
+    'tomato': {'humidity': 62, 'salinity': 2.0, 'temp': 25, 'status': 'OK'},
+    'pepper': {'humidity': 67, 'salinity': 1.5, 'temp': 28, 'status': 'OK'},
+    'cucumber': {'humidity': 72, 'salinity': 2.2, 'temp': 25, 'status': 'OK'},
+    'onion': {'humidity': 35, 'salinity': 1.1, 'temp': 21, 'status': 'Warning'}, # Warning
+    'pumpkin': {'humidity': 52, 'salinity': 1.7, 'temp': 24, 'status': 'OK'},
+}
+
+pump_status = {
+    'state': 'OFF',
+    'reason': 'Watering complete. All zones stable.',
+    'temp': 45,
+    'pressure': 50,
+    'manualOverride': False
+}
+
+weather_forecast = {
+    'today': {'temp': 26, 'rain': 10, 'icon': 'sun'},
+    'tomorrow': {'temp': 28, 'rain': 60, 'icon': 'cloud'}
+}
+
+simulation_running = False # To make sure we only start it once
+
+# --- 3. SIMULATION LOGIC ---
+
+def get_irrigation_status(plants, pump):
+    """Generates the main status bar text."""
+    if pump['state'] == 'ON':
+        return 'Pump is ON. Watering in progress...', 'blue'
+    
+    warning_plants = [name for name, data in plants.items() if data['status'] == 'Warning']
+    if warning_plants:
+        return f"Warning: {', '.join(warning_plants)} humidity low.", 'yellow'
+
+    critical_plants = [name for name, data in plants.items() if data['status'] == 'Critical']
+    if critical_plants:
+        return f"CRITICAL: {', '.join(critical_plants)} require immediate watering!", 'red'
+
+    return 'Pump is OFF. All plants are sufficiently watered.', 'green'
+
+def update_simulation_data():
+    """This function simulates the farm data changing."""
+    global pump_status, plant_zones, weather_forecast
+    
+    # 1. Simulate Plants (if pump is OFF)
+    if pump_status['state'] == 'OFF':
+        for plant, data in plant_zones.items():
+            data['humidity'] -= random.randint(0, 2)
+            data['humidity'] = max(20, data['humidity']) # Don't go below 20
+            
+            # Update status
+            if data['humidity'] < 40: data['status'] = 'Critical'
+            elif data['humidity'] < 55: data['status'] = 'Warning'
+            else: data['status'] = 'OK'
+            
+    # 2. Simulate Pump (Basic Auto-mode)
+    if not pump_status['manualOverride']:
+        is_critical = any(p['status'] == 'Critical' for p in plant_zones.values())
+        if is_critical and pump_status['state'] == 'OFF':
+            # Turn pump ON
+            pump_status['state'] = 'ON'
+            pump_status['reason'] = 'Auto-watering critical plants.'
+            # Simulate watering
+            for plant, data in plant_zones.items():
+                if data['status'] == 'Critical':
+                    data['humidity'] += 30 # Water them
+                    data['status'] = 'OK'
+            # After 3 seconds, turn it back off
+            socketio.sleep(3)
+            pump_status['state'] = 'OFF'
+            pump_status['reason'] = 'Auto-watering complete.'
+
+    # 3. Simulate sensors
+    pump_status['temp'] = random.randint(44, 46)
+    pump_status['pressure'] = random.randint(49, 51)
+    
+    # 4. Construct final data packet
+    irrigation_text, irrigation_color = get_irrigation_status(plant_zones, pump_status)
+    
+    return {
+        'weather': weather_forecast,
+        'pump': pump_status,
+        'plants': plant_zones,
+        'irrigation': {
+            'text': irrigation_text,
+            'color': irrigation_color
+        }
+    }
+
+
+def simulation_loop():
+    """This is the main loop for the farm simulator."""
+    print("--- Starting background simulation loop ---")
+    while True:
+        # 1. Get new simulated data
+        data_packet = update_simulation_data()
+        
+        # 2. Send this data to all connected dashboards
+        socketio.emit('farm_update', data_packet)
+        
+        # 3. Wait for 5 seconds before the next update
+        socketio.sleep(5) 
+
+# --- 4. SERVER ROUTES AND EVENTS ---
 
 @app.route('/')
 def index():
+    """Serves the index.html dashboard."""
     return render_template('index.html')
-
-# --- 3. SOCKET.IO EVENT HANDLERS ---
-
-@socketio.on('farm_update')
-def handle_farm_update(data):
-    """
-    Receives data from the farm simulator and broadcasts
-    it to all other connected clients (the web browsers).
-    """
-    emit('farm_update', data, broadcast=True) 
-       
-    # We will alert based on the *average* soil
-    if 'soil_avg' in data:
-        if data['soil_avg'] < ALERT_LEVEL:
-            socketio.start_background_task(send_alert, "critical")
-        elif data['soil_avg'] > (ALERT_LEVEL + 10):
-            socketio.start_background_task(send_alert, "good")
-
-# --- UPDATED: Handler for new plant-specific buttons ---
-@socketio.on('command_water')
-def handle_water_command(data):
-    """
-    Receives a command from a browser (e.g., { 'plant': 'tomatoes' }).
-    Broadcasts a 'sim_water_plant' event for the simulator to hear.
-    """
-    print(f"Server received water command from browser: {data}")
-    emit('sim_water_plant', data, broadcast=True)
 
 @socketio.on('connect')
 def handle_connect():
-    print('A client connected (Browser or Simulator)')
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    print('A client disconnected')
+    """A new user opened the dashboard."""
+    print('Client connected (Browser opened)')
     
-# --- 4. ALERTING LOGIC (ntfy.sh) ---
-def send_alert(alert_type="critical"):
-    global last_alert_sent
-    if alert_type == "critical" and not last_alert_sent:
-        last_alert_sent = True
-        print(f"ALERT! Soil is critical. Sending push notification...")
-        try:
-            requests.post(
-                ALERT_URL,
-                headers={
-                    "Title": "🚨 FARM ALERT! 🚨", "Priority": "5",
-                    "Tags": "rotating_light", "Click": APP_URL 
-                },
-                data="The soil is very dry! Please check the farm." 
-            )
-            print("Alert sent successfully.")
-        except Exception as e:
-            print(f"Error sending alert: {e}")
-            
-    elif alert_type == "good" and last_alert_sent:
-        print("RESET! Soil is good again.")
-        last_alert_sent = False 
+    global simulation_running
+    if not simulation_running:
+        # Start the background simulation only on the first connection
+        socketio.start_background_task(target=simulation_loop)
+        simulation_running = True
 
-# --- 5. RUN SERVER ---
+@socketio.on('command_force_start')
+def handle_force_start():
+    """Listens for the 'Force Start' button."""
+    global pump_status
+    pump_status['manualOverride'] = True
+    pump_status['state'] = 'ON'
+    pump_status['reason'] = 'Manual override: FORCED START'
+    print("--- Command Received: FORCE START ---")
+    # Immediately send an update
+    socketio.emit('farm_update', update_simulation_data())
+
+@socketio.on('command_force_stop')
+def handle_force_stop():
+    """Listens for the 'Force Stop' button."""
+    global pump_status
+    pump_status['manualOverride'] = True
+    pump_status['state'] = 'OFF'
+    pump_status['reason'] = 'Manual override: FORCED STOP'
+    print("--- Command Received: FORCE STOP ---")
+    # Immediately send an update
+    socketio.emit('farm_update', update_simulation_data())
+    
+@socketio.on('command_set_auto')
+def handle_set_auto():
+    """Listens for the 'Set Auto' button."""
+    global pump_status
+    pump_status['manualOverride'] = False
+    pump_status['reason'] = 'System set to automatic control.'
+    print("--- Command Received: SET AUTO ---")
+    # Immediately send an update
+    socketio.emit('farm_update', update_simulation_data())
+
+
+# --- 5. RUN THE SERVER ---
 if __name__ == '__main__':
-    print(f"Starting web server...")
+    print("--- Starting All-in-One Server ---")
+    # Get the port from Render's environment, or default to 8080
     port = int(os.environ.get('PORT', 8080))
-    socketio.run(app, host='0.0.0.0', port=port, debug=True)
+    # We must use eventlet to run the server
+    socketio.run(app, host='0.0.0.0', port=port)
