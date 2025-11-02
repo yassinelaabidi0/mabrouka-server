@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Mabrouka's Farm Status</title>
+    <title>Mabrouka's Farm Control</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     
@@ -17,10 +17,9 @@
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden;
-            background-color: #121212; /* Dark background */
+            overflow: auto; /* Allow scrolling on small screens */
+            background-color: #121212;
             color: #FFFFFF;
         }
         
@@ -30,7 +29,6 @@
             flex-direction: column;
             justify-content: flex-start;
             align-items: center;
-            height: 100%;
             padding: 20px;
             box-sizing: border-box;
         }
@@ -50,7 +48,7 @@
 
         /* --- Cards --- */
         .card {
-            background-color: #1E1E1E; /* Darker card color */
+            background-color: #1E1E1E;
             border-radius: 12px;
             padding: 24px;
             margin: 15px;
@@ -62,7 +60,7 @@
         .card h3 {
             margin-top: 0;
             font-size: 1.2rem;
-            color: #AAAAAA; /* Lighter title color */
+            color: #AAAAAA;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -80,41 +78,42 @@
             float: right;
         }
         
-        /* --- Dynamic Colors for Soil Card --- */
-        /* These will change the card's border and text color */
-        .good {
-            border-left: 5px solid #28a745; /* Green */
-        }
-        .good #soil-status {
-            color: #28a745;
-        }
+        /* --- Dynamic Colors --- */
+        .good { border-left: 5px solid #28a745; }
+        .good #soil-status { color: #28a745; }
+        .warn { border-left: 5px solid #ffc107; }
+        .warn #soil-status { color: #ffc107; }
+        .crit { border-left: 5px solid #dc3545; }
+        .crit #soil-status { color: #dc3545; }
 
-        .warn {
-            border-left: 5px solid #ffc107; /* Yellow */
-        }
-        .warn #soil-status {
-            color: #ffc107;
-        }
-
-        .crit {
-            border-left: 5px solid #dc3545; /* Red */
-        }
-        .crit #soil-status {
-            color: #dc3545;
-        }
-
-        /* --- Pump Status --- */
-        .pump-on {
-            color: #007bff; /* Blue for ON */
-        }
-        .pump-off {
-            color: #888888; /* Gray for OFF */
-        }
+        .pump-on { color: #007bff; }
+        .pump-off { color: #888888; }
         
         #loading {
             font-size: 1.5rem;
             color: #888;
             margin-top: 50px;
+        }
+        
+        /* --- NEW: Control Button --- */
+        #control-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 15px 25px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        #control-button:hover {
+            background-color: #0056b3;
+        }
+        #control-button:active {
+            background-color: #004a99;
+            transform: scale(0.98);
         }
 
     </style>
@@ -138,6 +137,11 @@
                 <h3>Pump Status</h3>
                 <div id="pump-status">--</div>
             </div>
+            
+            <div class="card" id="control-card">
+                <h3>Controls</h3>
+                <button id="control-button">Run Manual Water Cycle</button>
+            </div>
 
         </div>
     </div>
@@ -148,32 +152,29 @@
         // --- Find Elements ---
         const loading = document.getElementById('loading');
         const cardContainer = document.getElementById('card-container');
-        
         const soilCard = document.getElementById('soil-card');
         const soilStatus = document.getElementById('soil-status');
         const soilEmoji = document.getElementById('soil-emoji');
-        
         const pumpStatus = document.getElementById('pump-status');
+        
+        // NEW: Find the button
+        const controlButton = document.getElementById('control-button');
         
         // --- Connect to Socket.IO ---
         const socket = io(); 
 
         socket.on('connect', () => {
-            console.log('Connected to server!');
-            loading.style.display = 'none'; // Hide loading text
-            cardContainer.style.display = 'flex'; // Show dashboard
+            loading.style.display = 'none';
+            cardContainer.style.display = 'flex';
         });
 
         // --- Listen for Farm Updates ---
         socket.on('farm_update', (data) => {
-            console.log('Received update:', data);
-            
-            // --- Update Soil Card ---
             const soil = data.soil;
             if (soil > 70) {
                 soilStatus.innerHTML = 'Good';
                 soilEmoji.innerHTML = '🌱';
-                soilCard.className = 'card good'; // Set class to 'card' AND 'good'
+                soilCard.className = 'card good';
             } else if (soil > 30) {
                 soilStatus.innerHTML = 'Dry';
                 soilEmoji.innerHTML = '😟';
@@ -184,7 +185,6 @@
                 soilCard.className = 'card crit';
             }
             
-            // --- Update Pump Card ---
             const pump = data.pump;
             if (pump === "ON") {
                 pumpStatus.innerHTML = 'ON';
@@ -195,6 +195,13 @@
             }
         });
         
+        // --- NEW: Send Command on Button Click ---
+        controlButton.addEventListener('click', () => {
+            console.log('Sending command: run_pump_cycle');
+            // Send a new event to the server
+            socket.emit('run_pump_cycle'); 
+        });
+
         socket.on('disconnect', () => {
             loading.innerHTML = 'Reconnecting...';
             loading.style.display = 'block';
